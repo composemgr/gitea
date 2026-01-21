@@ -1,0 +1,55 @@
+# nginx proxy address - http://172.17.0.1:3001
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "1"
+
+services:
+  gitea:
+    image: gitea/gitea:latest
+    container_name: gitea-app
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - gitea
+    ports:
+      - "3001:3000"
+    environment:
+      TZ: ${TZ:-America/New_York}
+      DATABASE_URL: postgres://${DB_USER_NAME:-gitea}:${DB_USER_PASS:-changeme_db_password}@gitea-db:5432/${DB_CREATE_DATABASE_NAME:-gitea}
+    volumes:
+      - ./rootfs/data/gitea:/data
+      - ./rootfs/config/gitea:/config
+    depends_on:
+      - gitea-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  gitea-db:
+    image: postgres:16-alpine
+    container_name: gitea-db
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - gitea
+    environment:
+      TZ: ${TZ:-America/New_York}
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-gitea}
+      POSTGRES_USER: ${DB_USER_NAME:-gitea}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+    volumes:
+      - ./rootfs/db/postgres/gitea:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  gitea:
+    external: false

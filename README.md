@@ -51,9 +51,9 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/gitea` - Data storage
-- `./rootfs/config/gitea` - Data storage
-- `./rootfs/data/db/postgres/gitea` - Data storage
+- `./volumes/data/gitea` - Data storage
+- `./volumes/config/gitea` - Data storage
+- `./volumes/data/db/postgres/gitea` - Data storage
 
 ## 🔐 Security
 

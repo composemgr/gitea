@@ -16,6 +16,8 @@ services:
     logging: *default-logging
     networks:
       - gitea
+      - proxy
+      - cloudflare
     ports:
       - "172.17.0.1:3001:3000"
       - "2222:22"
@@ -36,9 +38,11 @@ services:
       GITEA__mailer__ENABLED: "true"
       GITEA__mailer__SMTP_ADDR: ${EMAIL_SERVER_HOST:-172.17.0.1}
       GITEA__mailer__SMTP_PORT: ${EMAIL_SERVER_PORT:-587}
-      GITEA__mailer__USER: ${EMAIL_SERVER_USER:-}
-      GITEA__mailer__PASSWD: ${EMAIL_SERVER_PASS:-}
+      GITEA__mailer__USER: ${EMAIL_SERVER_LOGIN_NAME:-}
+      GITEA__mailer__PASSWD: ${EMAIL_SERVER_LOGIN_PASS:-}
       GITEA__mailer__FROM: ${EMAIL_SERVER_MAIL_FROM:-noreply@example.com}
+      CONTAINER_NAME: gitea-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     volumes:
       - ./volumes/data/gitea:/data
       - /etc/timezone:/etc/timezone:ro
@@ -46,6 +50,22 @@ services:
     depends_on:
       gitea-db:
         condition: service_healthy
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://gitea-app:3000'
+      - 'cloudflare.hostname=gitea.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.gitea-app.entrypoints=http'
+      - 'traefik.http.routers.gitea-app-secure.tls=true'
+      - 'traefik.http.routers.gitea-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.gitea-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.gitea-app.middlewares=gitea-app-https-redirect'
+      - 'traefik.http.routers.gitea-app-secure.entrypoints=https'
+      - 'traefik.http.routers.gitea-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.gitea-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.gitea-app-secure.service=gitea-app'
+      - 'traefik.http.services.gitea-app.loadbalancer.server.port=3000'
 
   gitea-db:
     image: postgres:latest
@@ -60,6 +80,7 @@ services:
       POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-gitea}
       POSTGRES_USER: ${DB_USER_NAME:-gitea}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      CONTAINER_NAME: gitea-db
     volumes:
       - ./volumes/data/db/postgres/gitea:/var/lib/postgresql/data
     healthcheck:
@@ -72,3 +93,7 @@ networks:
   gitea:
     name: gitea
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true

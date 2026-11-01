@@ -1,19 +1,18 @@
 ## 👋 Welcome to gitea 🚀
 
-Lightweight self-hosted Git service
+The Git server with a great UI, written in Go
 
 ## 📋 Description
 
-Lightweight self-hosted Git service
+The Git server with a great UI, written in Go
 
 ## 🚀 Services
 
-- **gitea**: gitea/gitea:latest
+- **app**: gitea/gitea:latest
 
 ### Infrastructure Components
 
 - **gitea-db**: Postgres database
-
 
 ## 📦 Installation
 
@@ -26,7 +25,8 @@ curl -q -LSsf "https://raw.githubusercontent.com/composemgr/gitea/main/docker-co
 ```bash
 git clone "https://github.com/composemgr/gitea" ~/.local/srv/docker/gitea
 cd ~/.local/srv/docker/gitea
-docker compose up -d
+cp default.env .env
+docker compose --env-file .env up -d
 ```
 
 ### Option 3: Using composemgr
@@ -40,25 +40,68 @@ composemgr install gitea
 
 ```shell
 TZ=America/New_York
-DB_USER_NAME=gitea
+BASE_HOST_NAME=gitea.example.com
+APP_SECRET_KEY=replace-with-a-random-password
+APP_INTERNAL_TOKEN=replace-with-a-random-password
+DB_USER_PASS=replace-with-a-random-password
 ```
 
 See `docker-compose.yaml` for complete list of configurable options.
 
+### Environment Files
+
+`default.env.sample` holds the full set of variables and is copied to `.env`
+before starting the stack:
+
+```bash
+cp default.env .env
+docker compose --env-file .env up -d
+```
+
+`app.env.sample` holds the app-specific overrides and is copied to `app.env`:
+
+```bash
+cp app.env.sample app.env
+```
+
+`composemgr up` applies `app.env` and `default.env` automatically. Raw
+`docker compose` commands need `--env-file .env` to pick up the same values.
+
+### Reverse Proxy
+
+Three standalone compose files ship in this repo:
+
+| File | Use |
+|------|-----|
+| `docker-compose.yaml` | Default, published on `172.17.0.1:64185` |
+| `docker-compose.traefik.yaml` | Behind an existing external `traefik` network |
+| `docker-compose.tunnel.yaml` | Behind an existing external `cloudflare` tunnel network |
+
+```bash
+docker compose -f docker-compose.traefik.yaml --env-file .env up -d
+```
+
+No variant publishes the SSH port. Gitea's SSH listener (22) is reachable only
+from other containers on the project network, so `git clone` over SSH needs
+either an SSH sidecar on that network or a separate published mapping added
+deliberately to a local copy.
+
 ## 🌐 Access
 
-- **Web Interface**: http://172.17.0.1:3001
+- **Web Interface**: http://172.17.0.1:64185
 
 ## 📂 Volumes
 
-- `./volumes/data/gitea` - Data storage
-- `./volumes/config/gitea` - Data storage
-- `./volumes/data/db/postgres/gitea` - Data storage
+- `./volumes/data/gitea` - Git repositories and application data
+- `./volumes/db/postgres/gitea` - Database data
 
 ## 🔐 Security
 
 - Change all default passwords before deploying to production
-- Use strong secrets for all authentication tokens
+- Set `APP_SECRET_KEY` and `APP_INTERNAL_TOKEN` to strong random values
+- The SSH port is not published to the host; keep it that way unless you put
+  an authentication layer in front of it
+- Gitea sends transactional emails; configure a real SMTP relay
 - Configure HTTPS using a reverse proxy (nginx, traefik, caddy)
 - Regularly update Docker images for security patches
 - Backup your data regularly
@@ -66,26 +109,26 @@ See `docker-compose.yaml` for complete list of configurable options.
 ## 🔍 Logging
 
 ```shell
-docker compose logs -f gitea
+docker compose --env-file .env logs -f app
 ```
 
 ## 🛠️ Management
 
 ```bash
 # Start services
-docker compose up -d
+docker compose --env-file .env up -d
 
 # Stop services
-docker compose down
+docker compose --env-file .env down
 
 # Update to latest images
-docker compose pull && docker compose up -d
+docker compose --env-file .env pull && docker compose --env-file .env up -d
 
 # View logs
-docker compose logs -f
+docker compose --env-file .env logs -f
 
 # Restart services
-docker compose restart
+docker compose --env-file .env restart
 ```
 
 ## 📋 Requirements

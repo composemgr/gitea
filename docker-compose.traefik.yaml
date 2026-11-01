@@ -1,0 +1,99 @@
+name: gitea
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: gitea/gitea:latest
+    container_name: gitea-app
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      GITEA__DEFAULT__APP_NAME: ${APP_ORG_NAME:-Gitea}
+      GITEA__server__DOMAIN: ${BASE_HOST_NAME:-$HOSTNAME}
+      GITEA__server__ROOT_URL: https://${BASE_HOST_NAME:-$HOSTNAME}
+      GITEA__server__HTTP_PORT: 3000
+      GITEA__server__SSH_DOMAIN: ${BASE_HOST_NAME:-$HOSTNAME}
+      GITEA__server__SSH_PORT: 2222
+      GITEA__server__SSH_LISTEN_PORT: 22
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__HOST: gitea-db:5432
+      GITEA__database__NAME: ${DB_CREATE_DATABASE_NAME:-gitea}
+      GITEA__database__USER: ${DB_USER_NAME:-gitea}
+      GITEA__database__PASSWD: ${DB_USER_PASS:-replace-with-a-random-password}
+      GITEA__security__SECRET_KEY: ${APP_SECRET_KEY:-replace-with-a-random-password}
+      GITEA__security__INTERNAL_TOKEN: ${APP_INTERNAL_TOKEN:-replace-with-a-random-password}
+      GITEA__mailer__ENABLED: "true"
+      GITEA__mailer__PROTOCOL: smtp+starttls
+      GITEA__mailer__SMTP_ADDR: ${EMAIL_SERVER_HOST:-172.17.0.1}
+      GITEA__mailer__SMTP_PORT: ${EMAIL_SERVER_PORT:-587}
+      GITEA__mailer__USER: ${EMAIL_SERVER_LOGIN_NAME:-}
+      GITEA__mailer__PASSWD: ${EMAIL_SERVER_LOGIN_PASS:-}
+      GITEA__mailer__FROM: ${EMAIL_SERVER_MAIL_FROM:-noreply@example.com}
+      CONTAINER_NAME: gitea-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+    volumes:
+      - './volumes/data/gitea:/data'
+      - '/etc/timezone:/etc/timezone:ro'
+      - '/etc/localtime:/etc/localtime:ro'
+    depends_on:
+      gitea-db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.gitea-app.entrypoints=http'
+      - 'traefik.http.routers.gitea-app.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.gitea-app.middlewares=gitea-app-https-redirect'
+      - 'traefik.http.middlewares.gitea-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.gitea-app-secure.entrypoints=https'
+      - 'traefik.http.routers.gitea-app-secure.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.gitea-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.gitea-app-secure.service=gitea-app'
+      - 'traefik.http.services.gitea-app.loadbalancer.server.port=3000'
+    networks:
+      - gitea
+      - traefik
+
+  gitea-db:
+    image: postgres:latest
+    container_name: gitea-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: gitea-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-gitea}
+      POSTGRES_USER: ${DB_USER_NAME:-gitea}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+      CONTAINER_NAME: gitea-db
+    volumes:
+      - './volumes/db/postgres/gitea:/var/lib/postgresql/data:z'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gitea
+
+networks:
+  gitea:
+    name: gitea
+    external: false
+  traefik:
+    external: true

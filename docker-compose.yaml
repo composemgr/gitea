@@ -43,6 +43,7 @@ services:
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     ports:
       - '172.17.0.1:64185:3000'
+      - '2222:22'
     volumes:
       - './volumes/data/gitea:/data'
       - '/etc/timezone:/etc/timezone:ro'

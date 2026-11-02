@@ -90,6 +90,8 @@ deliberately to a local copy.
 
 - **Web Interface**: http://172.17.0.1:64185
 
+Non-HTTP protocol ports are published identically in all three compose variants, because they cannot be proxied over HTTP: `2222` (Git SSH, container `22`).
+
 ## 📂 Volumes
 
 - `./volumes/data/gitea` - Git repositories and application data

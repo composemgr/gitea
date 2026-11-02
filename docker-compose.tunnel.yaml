@@ -39,6 +39,8 @@ services:
       GITEA__mailer__FROM: ${EMAIL_SERVER_MAIL_FROM:-noreply@example.com}
       CONTAINER_NAME: gitea-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+    ports:
+      - '2222:22'
     volumes:
       - './volumes/data/gitea:/data'
       - '/etc/timezone:/etc/timezone:ro'
